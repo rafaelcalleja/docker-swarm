@@ -1,0 +1,90 @@
+version: "3.6"
+
+services:
+
+  proxy:
+    image: dockerflow/docker-flow-proxy
+    networks:
+      - proxy
+    ports:
+      - '5000:5000'
+      - '8003:80'
+      - '8080:8080'
+    environment:
+      - LISTENER_ADDRESS=swarm-listener
+      - MODE=swarm
+      - DEFAULT_PORTS=80
+      #- CONNECTION_MODE=${CONNECTION_MODE:-http-server-close}
+      #- TIMEOUT_HTTP_REQUEST=15
+      #- TIMEOUT_CONNECT=15
+      - BIND_PORTS=80,5000
+      #- MODE=default
+      #- BIND_PORTS=8003
+      #- DEBUG=false
+  swarm-listener:
+    image: dockerflow/docker-flow-swarm-listener
+    networks:
+      - proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DF_NOTIFY_CREATE_SERVICE_URL=http://proxy:8080/v1/docker-flow-proxy/reconfigure
+      - DF_NOTIFY_REMOVE_SERVICE_URL=http://proxy:8080/v1/docker-flow-proxy/remove
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+  backend:
+    build: ./backend
+    image: private-registry:5000/backend-demo
+    hostname: "{{.Node.Hostname}}-backend"
+    networks:
+      - proxy
+    #ports:
+    #  - '8003:80'
+    deploy:
+      labels:
+        - com.df.notify=true
+        #- com.df.distribute=true
+        #- com.df.connectionMode=http-keep-alive
+        - com.df.servicePath=/
+        #- com.df.reqPathSearch=/
+        - com.df.port=80
+        - com.df.srcPort=8003
+  registry:
+    #restart: always
+    image: registry:2
+    hostname: private-registry
+    container_name: private-registry
+    networks:
+      - proxy
+    deploy:
+      labels:
+        - com.df.notify=true
+        - com.df.servicePath=/
+        - com.df.port=5000
+        - com.df.srcPort=5000
+    environment:
+      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/domain.crt
+      REGISTRY_HTTP_TLS_KEY: /certs/domain.key
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: Registry Realm
+    volumes:
+      - registry:/var/lib/registry
+      - './registry/certs:/certs'
+      - './registry/auth:/auth'
+  viz:
+    image: dockersamples/visualizer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    ports:
+      - "8082:8080"
+networks:
+  proxy:
+    driver: overlay
+    external: true
+volumes:
+  registry:

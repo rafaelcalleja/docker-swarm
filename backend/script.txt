@@ -1,0 +1,26 @@
+sudo cp certs/domain.crt /etc/docker/certs.d/private-registry:5000/
+sudo cp certs/domain.crt /usr/local/share/ca-certificates/private-registry.crt
+sudo update-ca-certificates
+
+#RESTART docker
+
+
+
+docker swarm init
+docker network create -d overlay --attachable proxy
+
+
+# Get join token:
+SWARM_TOKEN=$(docker swarm join-token -q worker)
+echo $SWARM_TOKEN
+
+# Get Swarm master IP (Docker for Mac xhyve VM IP)
+SWARM_MASTER_IP=$(docker info | grep -w 'Node Address' | awk '{print $3}')
+echo $SWARM_MASTER_IP
+# Number of workers
+NUM_WORKERS=3
+
+for i in $(seq "${NUM_WORKERS}"); do
+	docker run --rm -d --network proxy --privileged --name worker-${i} --hostname=worker-${i} -p ${i}2375:2375 docker:stable-dind
+	docker --host=localhost:${i}2375 swarm join --token ${SWARM_TOKEN} ${SWARM_MASTER_IP}:2377
+done
