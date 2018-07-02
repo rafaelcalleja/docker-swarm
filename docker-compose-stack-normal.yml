@@ -1,33 +1,50 @@
 version: "3.6"
 
 services:
+  proxy:
+    image: dockercloud/haproxy
+    depends_on:
+      - backend
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - target: 80
+        published: 8003
+        protocol: tcp
+        mode: swarm
+    networks:
+      - proxy
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    environment:
+      - BALANCE=leastconn
   backend:
     build: ./backend
     image: private-registry:5000/backend-demo
     hostname: "{{.Node.Hostname}}-backend"
     networks:
       - proxy
-      - default
-    deploy:
-      labels:
-        - com.df.notify=true
-        - com.df.distribute=true
-        - com.df.servicePath=/
-        - com.df.port=80
-        - com.df.srcPort=8003
+    ports:
+      - target: 80
+        published: 8080
+        protocol: tcp
+        mode: host
+    environment:
+      - SERVICE_PORTS=80
+    #deploy:
+    #  placement:
+    #    constraints: [node.role == manager]
+    #  replicas: 1
+    #  update_config:
+    #   parallelism: 5
+    #   delay: 10s
+    #  restart_policy:
+    #   condition: on-failure
+    #   max_attempts: 3
+    #   window: 120s
     #ports:
     #  - '8003:80'
-  portainer:
-    image: portainer/portainer
-    restart: on-failure
-    ports:
-      - 8083:9000
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    deploy:
-      placement:
-        constraints:
-          - node.role == manager
   registry:
     #restart: always
     image: registry:2
@@ -53,20 +70,9 @@ services:
       - registry:/var/lib/registry
       - './registry/certs:/certs'
       - './registry/auth:/auth'
-  viz:
-    image: dockersamples/visualizer
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    deploy:
-      placement:
-        constraints: [node.role == manager]
-    ports:
-      - "8082:8080"
 networks:
-  default:
-    external: false
   proxy:
     external: true
-#    driver: overlay
+    driver: overlay
 volumes:
   registry:

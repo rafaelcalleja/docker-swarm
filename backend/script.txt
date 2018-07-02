@@ -1,3 +1,8 @@
+/etc/docker/daemon.json
+{
+    "insecure-registries": ["private-registry:5000"]
+}
+
 sudo cp certs/domain.crt /etc/docker/certs.d/private-registry:5000/
 sudo cp certs/domain.crt /usr/local/share/ca-certificates/private-registry.crt
 sudo update-ca-certificates
@@ -6,9 +11,11 @@ sudo update-ca-certificates
 
 
 
-docker swarm init
-docker network create -d overlay --attachable proxy
+docker swarm init --advertise-addr 10.0.2.15 --listen-addr enp0s3:2377
 
+docker network create -d overlay --attachable proxy # --opt encrypted
+
+socat TCP-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock
 
 # Get join token:
 SWARM_TOKEN=$(docker swarm join-token -q worker)
@@ -21,6 +28,7 @@ echo $SWARM_MASTER_IP
 NUM_WORKERS=3
 
 for i in $(seq "${NUM_WORKERS}"); do
-	docker run --rm -d --network proxy --privileged --name worker-${i} --hostname=worker-${i} -p ${i}2375:2375 docker:stable-dind
+    docker node rm --force $(docker node ls --filter "name=worker-${i}" -q) > /dev/null 2>&1
+	docker run --rm --add-host=private-registry:10.10.10.10 -d --network proxy --privileged --name worker-${i} --hostname=worker-${i} -p ${i}2375:2375 docker:stable-dind
 	docker --host=localhost:${i}2375 swarm join --token ${SWARM_TOKEN} ${SWARM_MASTER_IP}:2377
 done

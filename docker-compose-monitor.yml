@@ -1,0 +1,24 @@
+version: "3.6"
+
+services:
+  portainer:
+    image: portainer/portainer
+    restart: on-failure
+    ports:
+      - 8083:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+  viz:
+    image: dockersamples/visualizer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    ports:
+      - "8082:8080"
+

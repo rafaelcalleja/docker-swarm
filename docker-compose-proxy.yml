@@ -1,0 +1,40 @@
+version: "3.6"
+
+services:
+  proxy:
+    image: dockerflow/docker-flow-proxy
+    networks:
+      - proxy
+    ports:
+      - '8003:80'
+      - '8080:8080'
+    environment:
+      - LISTENER_ADDRESS=swarm-listener
+      - MODE=swarm
+      - DEFAULT_PORTS=80
+      #- CONNECTION_MODE=${CONNECTION_MODE:-http-server-close}
+      #- TIMEOUT_HTTP_REQUEST=15
+      #- TIMEOUT_CONNECT=15
+      - BIND_PORTS=80
+      #,5000
+      #- MODE=default
+      #- BIND_PORTS=8003
+      #- DEBUG=false
+    #extra_hosts:
+    #  - "private_registry:10.10.10.10"
+  swarm-listener:
+    image: dockerflow/docker-flow-swarm-listener
+    networks:
+      - proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DF_NOTIFY_CREATE_SERVICE_URL=http://proxy:8080/v1/docker-flow-proxy/reconfigure
+      - DF_NOTIFY_REMOVE_SERVICE_URL=http://proxy:8080/v1/docker-flow-proxy/remove
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+networks:
+  proxy:
+    driver: overlay
+    external: true

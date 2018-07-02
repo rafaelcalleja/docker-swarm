@@ -1,0 +1,14 @@
+version: "3.6"
+
+services:
+  demoweb:
+    image: rafaelcalleja/webdemo
+    deploy:
+      replicas: 2
+      placement:
+        constraints: [node.role != manager]
+    ports:
+      - published: 9090
+        #target: 80
+        protocol: tcp
+        mode: ingress

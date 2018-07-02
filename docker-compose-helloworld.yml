@@ -1,0 +1,8 @@
+version: "3.6"
+
+services:
+  helloworld:
+    image: hello-world
+    deploy:
+      placement:
+        constraints: [node.role != manager]

@@ -1,0 +1,24 @@
+version: '3.6'
+
+services:
+   backend:
+      build: ./backend
+      image: private-registry:5000/backend-demo
+      hostname: "{{.Node.Hostname}}-backend"
+      networks:
+        - proxy
+        - default
+      deploy:
+        replicas: 3
+        labels:
+          - com.df.notify=true
+          - com.df.distribute=true
+          - com.df.servicePath=/
+          - com.df.port=80
+          - com.df.srcPort=8003
+
+networks:
+  default:
+    external: false
+  proxy:
+    external: true
